@@ -1,0 +1,3 @@
+[submodule "twsfwphysx/twsfwphysx"]
+	path = twsfwphysx/twsfwphysx
+	url = git@github.com:Tondorf/twsfwphysx.git

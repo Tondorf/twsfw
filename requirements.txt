@@ -1,0 +1,5 @@
+# A set of tested and working requirements for the project.
+# Versions are automatically updated by dependabot.
+#
+# Example:
+# numpy==1.19.5
