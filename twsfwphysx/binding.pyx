@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from math import pi
 
 from libc.stdint cimport uint32_t, int32_t
 
@@ -11,7 +12,8 @@ cdef extern from "twsfwphysx/twsfwphysx.h":
 
     cdef struct twsfwphysx_agent:
         twsfwphysx_vec r
-        twsfwphysx_vec L
+        twsfwphysx_vec u
+        float v
         float a
         int32_t hp
 
@@ -21,7 +23,8 @@ cdef extern from "twsfwphysx/twsfwphysx.h":
 
     cdef struct twsfwphysx_missile:
         twsfwphysx_vec r
-        twsfwphysx_vec L
+        twsfwphysx_vec u
+        float v
 
     cdef struct twsfwphysx_missiles:
         twsfwphysx_missile *missiles
@@ -62,6 +65,8 @@ cdef extern from "twsfwphysx/twsfwphysx.h":
                              int32_t n_steps,
                              void *buffer)
 
+    void twsfwphysx_rotate_agent(twsfwphysx_agent *agent, float angle)
+
 
 def get_twsfwphysx_version():
     cdef const char* version = twsfwphysx_version()
@@ -86,7 +91,8 @@ class Vec3:
 @dataclass
 class Agent:
     r: Vec3
-    L: Vec3
+    u: Vec3
+    v: float
     a: float
     hp: int
     
@@ -94,19 +100,20 @@ class Agent:
 @dataclass
 class Missile:
     r: Vec3
-    L: Vec3
+    u: Vec3
+    v: float
 
 
 def make_twsfwphysx_agent(agent: Agent):
     cdef twsfwphysx_vec r = twsfwphysx_vec(agent.r.x, agent.r.y, agent.r.z)
-    cdef twsfwphysx_vec L = twsfwphysx_vec(agent.L.x, agent.L.y, agent.L.z)
-    return twsfwphysx_agent(r, L, agent.a, agent.hp)
+    cdef twsfwphysx_vec u = twsfwphysx_vec(agent.u.x, agent.u.y, agent.u.z)
+    return twsfwphysx_agent(r, u, agent.v, agent.a, agent.hp)
 
 
 def make_twsfwphysx_missile(missile: Missile):
     cdef twsfwphysx_vec r = twsfwphysx_vec(missile.r.x, missile.r.y, missile.r.z)
-    cdef twsfwphysx_vec L = twsfwphysx_vec(missile.L.x, missile.L.y, missile.L.z)
-    return twsfwphysx_missile(r, L)
+    cdef twsfwphysx_vec u = twsfwphysx_vec(missile.u.x, missile.u.y, missile.u.z)
+    return twsfwphysx_missile(r, u, missile.v)
 
 
 cdef class Engine():
@@ -151,12 +158,22 @@ cdef class Engine():
     def add_missile(self, missile: Missile):
         twsfwphysx_add_missile(&self._missiles, make_twsfwphysx_missile(missile))
 
+    def rotate_agent(self, idx: int, angle: float, degrees: bool=True):
+        if idx < 0 or idx >= self._agents.size:
+            raise IndexError(f"Invalid index '{idx=}' (total number of agents: {self._agents.size})")
+
+        if degrees:
+            angle = angle / 180 * pi
+
+        twsfwphysx_rotate_agent(&self._agents.agents[idx], angle)
+
     @property
     def agents(self):
         agents = [self._agents.agents[i] for i in range(self._agents.size)]
         return [Agent(
             Vec3(a["r"]["x"], a["r"]["y"], a["r"]["z"]),
-            Vec3(a["L"]["x"], a["L"]["y"], a["L"]["z"]),
+            Vec3(a["u"]["x"], a["u"]["y"], a["u"]["z"]),
+            a["v"],
             a["a"],
             a["hp"],
         ) for a in agents]
@@ -166,6 +183,7 @@ cdef class Engine():
         missiles = [self._missiles.missiles[i] for i in range(self._missiles.size)]
         return [Missile(
             Vec3(m["r"]["x"], m["r"]["y"], m["r"]["z"]),
-            Vec3(m["L"]["x"], m["L"]["y"], m["L"]["z"]),
+            Vec3(m["u"]["x"], m["u"]["y"], m["u"]["z"]),
+            m["v"],
         ) for m in missiles]
         
