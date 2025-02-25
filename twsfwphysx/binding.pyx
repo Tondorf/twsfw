@@ -1,3 +1,4 @@
+import struct
 from dataclasses import dataclass
 from math import pi
 
@@ -80,12 +81,24 @@ class World:
     agent_radius: float
     missile_acceleration: float
 
+    def serialize(self) -> bytes:
+        return struct.pack(
+            "<4f",
+            self.friction,
+            self.restitution,
+            self.agent_radius,
+            self.missile_acceleration,
+        )
+
 
 @dataclass
 class Vec3:
     x: float
     y: float
     z: float
+
+    def serialize(self) -> bytes:
+        return struct.pack("<3f", self.x, self.y, self.z)
 
 
 @dataclass
@@ -95,6 +108,11 @@ class Agent:
     v: float
     a: float
     hp: int
+
+    def serialize(self) -> bytes:
+        buffer = self.r.serialize() + self.u.serialize()
+        buffer += struct.pack("<2fi", self.v, self.a, self.hp)
+        return buffer
     
 
 @dataclass
@@ -102,6 +120,11 @@ class Missile:
     r: Vec3
     u: Vec3
     v: float
+
+    def serialize(self) -> bytes:
+        buffer = self.r.serialize() + self.u.serialize()
+        buffer += struct.pack("<f", self.v)
+        return buffer
 
 
 def make_twsfwphysx_agent(agent: Agent):
@@ -145,6 +168,13 @@ cdef class Engine():
         if self._simulation_buffer:
             twsfwphysx_delete_simulation_buffer(self._simulation_buffer)
 
+    def _check_agent_idx(self, idx: int):
+        if idx < 0 or idx >= self._agents.size:
+            raise IndexError(
+                f"Invalid index '{idx}' (total number of agents: {self._agents.size})"
+            )
+        
+
     def simulate(self, *, t: float, n_steps: int):
         twsfwphysx_simulate(
             &self._agents,
@@ -155,17 +185,30 @@ cdef class Engine():
             self._simulation_buffer
         )
 
-    def add_missile(self, missile: Missile):
-        twsfwphysx_add_missile(&self._missiles, make_twsfwphysx_missile(missile))
-
-    def rotate_agent(self, idx: int, angle: float, degrees: bool=True):
-        if idx < 0 or idx >= self._agents.size:
-            raise IndexError(f"Invalid index '{idx=}' (total number of agents: {self._agents.size})")
+    def rotate_agent(self, *, agent_idx: int, angle: float, degrees: bool=True):
+        self._check_agent_idx(agent_idx)
 
         if degrees:
             angle = angle / 180 * pi
 
-        twsfwphysx_rotate_agent(&self._agents.agents[idx], angle)
+        twsfwphysx_rotate_agent(&self._agents.agents[agent_idx], angle)
+
+    def set_agent_acceleration(self, *, agent_idx: int, a: float):
+        self._check_agent_idx(agent_idx)
+        self._agents.agents[agent_idx].a = a
+
+    def set_agent_hp(self, *, agent_idx: int, hp: int):
+        self._check_agent_idx(agent_idx)
+        self._agents.agents[agent_idx].hp = hp
+
+    def launch_missile(self, *, agent_idx: int):
+        self._check_agent_idx(agent_idx)
+
+        agent = self._agents.agents[agent_idx]
+        missile = make_twsfwphysx_missile(Missile(agent.r, agent.u, agent.v))
+        twsfwphysx_add_missile(&self._missiles, missile)
+
+        
 
     @property
     def agents(self):

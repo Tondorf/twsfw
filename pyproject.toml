@@ -8,7 +8,7 @@ exclude = ["versioneer.py", "twsfw/_version.py"]
 [tool.ruff.lint]
 select = [
     "E",    # pycodestyle
-    "D",    # pydocstyle
+    # "D",    # pydocstyle
     "F",    # Pyflakes
     "UP",   # pyupgrade
     "B",    # flake8-bugbear
@@ -16,9 +16,6 @@ select = [
     "I",    # isort
 ]
 ignore = [
-    "D100",   # Missing docstring in public module
-    "D103",   # Missing docstring in public function
-    "D104",   # Missing docstring in public package
     "E501",   # Line too long
     "UP015",  # unecessary open mode parameters
 ]

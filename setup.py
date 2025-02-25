@@ -27,7 +27,7 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     packages=find_packages(exclude=["docs", "tests"]),
     python_requires=">=3.12",
-    install_requires=[],
+    install_requires=["wasmtime"],
     extras_require={
         "dev": [
             "pre-commit",

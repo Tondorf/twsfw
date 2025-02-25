@@ -1,4 +1,4 @@
-from twsfw import __twsfwphysx_version__
+from twsfw.physx import __twsfwphysx_version__
 
 
 def test_engine_version():
