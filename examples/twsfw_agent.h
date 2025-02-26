@@ -27,7 +27,6 @@ struct twsfw_missile {
 };
 
 struct twsfw_world {
-	float friction;
 	float restitution;
 	float agent_radius;
 	float missile_acceleration;

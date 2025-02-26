@@ -21,7 +21,6 @@ class WASMAgent:
 class World(physx.World):
     dt: float
     n_simulation_steps: int
-    init_hp: float
     max_hp: float
     healing_rate: float
     max_rotation_rate: float
@@ -63,7 +62,7 @@ def init_agents(n, *, init_hp):
 class Game:
     def __init__(self, *, agents: list[str], world: World):
         self.physx_engine = physx.Engine(
-            world, init_agents(len(agents), init_hp=world.init_hp)
+            world, init_agents(len(agents), init_hp=world.max_hp)
         )
         self.state = State(self.physx_engine.agents, self.physx_engine.missiles, world)
 
@@ -78,10 +77,6 @@ class Game:
             func = instance.exports(self.wasm_store)["twsfw_agent_act"]
 
             self.wasm_agents.append(WASMAgent(instance, memory, func))
-
-    def update_state(self, agents: list[physx.Agent], missiles: list[physx.Missile]):
-        self.state.agents = agents
-        self.state.missiles = missiles
 
     def _call_agents(self):
         buffer, offset = self.state.serialize()
@@ -109,23 +104,12 @@ class Game:
                 ),
             )
 
-            match action_type:
-                case 0:
-                    yield {"action": "turn", "value": value}
-
-                case 1:
-                    yield {"action": "accelerate", "value": value}
-
-                case 2:
-                    yield {"action": "fire", "value": None}
-
-                case _:
-                    yield {"action": "unknown", "value": None}
+            yield action_type, value
 
     def tick(self):
         for i, agent in enumerate(self.state.agents):
             hp = min(agent.hp + self.state.world.healing_rate, self.state.world.max_hp)
-            self.physx_engine.set_agent_hp(agent_idx=i, hp=hp)
+            self.physx_engine.update_agent(agent_idx=i, hp=hp)
 
         self.physx_engine.simulate(
             t=self.state.world.dt, n_steps=self.state.world.n_simulation_steps
@@ -134,27 +118,23 @@ class Game:
         self.state.agents = self.physx_engine.agents
         self.state.missiles = self.physx_engine.missiles
 
-        for i, action in enumerate(self._call_agents()):
-            match action["action"]:
-                case "turn":
-                    angle = action["value"]
+        for i, (action_type, value) in enumerate(self._call_agents()):
+            match action_type:
+                case 0:  # turn
                     max_angle = self.state.world.max_rotation_rate
-
                     self.physx_engine.rotate_agent(
                         agent_idx=i,
-                        angle=min(max(angle, -max_angle), max_angle),
+                        angle=min(max(value, -max_angle), max_angle),
                         degrees=True,
                     )
 
-                case "accelerate":
-                    a = action["value"]
+                case 1:  # change acceleration
                     max_a = self.state.world.max_agent_acceleration
-
-                    self.physx_engine.set_agent_acceleration(
-                        agent_idx=i, a=min(max(a, 0.0), max_a)
+                    self.physx_engine.update_agent(
+                        agent_idx=i, a=min(max(value, 0.0), max_a)
                     )
 
-                case "fire":
+                case 2:  # fire
                     self.physx_engine.launch_missile(agent_idx=i)
 
                 case _:

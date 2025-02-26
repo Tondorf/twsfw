@@ -33,7 +33,6 @@ cdef extern from "twsfwphysx/twsfwphysx.h":
         int32_t capacity
 
     cdef struct twsfwphysx_world:
-        float friction
         float restitution
         float agent_radius
         float missile_acceleration
@@ -76,15 +75,13 @@ def get_twsfwphysx_version():
 
 @dataclass
 class World:
-    friction: float
     restitution: float
     agent_radius: float
     missile_acceleration: float
 
     def serialize(self) -> bytes:
         return struct.pack(
-            "<4f",
-            self.friction,
+            "<3f",
             self.restitution,
             self.agent_radius,
             self.missile_acceleration,
@@ -147,7 +144,6 @@ cdef class Engine():
 
     def __init__(self, world: World, agents: list[Agent]):
         self._world = twsfwphysx_world(
-            world.friction,
             world.restitution,
             world.agent_radius,
             world.missile_acceleration
@@ -193,13 +189,21 @@ cdef class Engine():
 
         twsfwphysx_rotate_agent(&self._agents.agents[agent_idx], angle)
 
-    def set_agent_acceleration(self, *, agent_idx: int, a: float):
+    def update_agent(self, *, agent_idx: int, **kwargs):
         self._check_agent_idx(agent_idx)
-        self._agents.agents[agent_idx].a = a
 
-    def set_agent_hp(self, *, agent_idx: int, hp: int):
-        self._check_agent_idx(agent_idx)
-        self._agents.agents[agent_idx].hp = hp
+        for k, v in kwargs.items():
+            # unfortunately, the following does not work:/
+            # setattr(self._agents.agents[agent_idx], k, v)
+
+            if k == "v":
+                self._agents.agents[agent_idx].v = v
+            elif k == "a":
+                self._agents.agents[agent_idx].a = v
+            elif k == "hp":
+                self._agents.agents[agent_idx].hp = v
+            else:
+                raise ValueError(f"Cannot update attribute '{k}' for agent")
 
     def launch_missile(self, *, agent_idx: int):
         self._check_agent_idx(agent_idx)
