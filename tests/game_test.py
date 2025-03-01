@@ -31,5 +31,4 @@ def test_game(wasm_agent):
     assert w.healing_rate == world.healing_rate
     assert w.max_rotation_rate == pytest.approx(world.max_rotation_rate)
     assert w.max_agent_acceleration == pytest.approx(world.max_agent_acceleration)
-
     assert len(state.agents) == 1

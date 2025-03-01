@@ -61,9 +61,7 @@ def init_agents(n, *, init_hp):
 
 class Game:
     def __init__(self, *, agents: list[str], world: World):
-        self.physx_engine = physx.Engine(
-            world, init_agents(len(agents), init_hp=world.max_hp)
-        )
+        self.physx_engine = physx.Engine(world, init_agents(len(agents), init_hp=world.max_hp))
         self.state = State(self.physx_engine.agents, self.physx_engine.missiles, world)
 
         self.wasm_engine = wasmtime.Engine()
@@ -77,6 +75,8 @@ class Game:
             func = instance.exports(self.wasm_store)["twsfw_agent_act"]
 
             self.wasm_agents.append(WASMAgent(instance, memory, func))
+
+        self.ticks = 0
 
     def _call_agents(self):
         buffer, offset = self.state.serialize()
@@ -99,9 +99,7 @@ class Game:
 
             (action_type,) = struct.unpack(
                 "<i",
-                agent.memory.read(
-                    self.wasm_store, offset["action"], offset["action"] + 4
-                ),
+                agent.memory.read(self.wasm_store, offset["action"], offset["action"] + 4),
             )
 
             yield action_type, value
@@ -111,9 +109,7 @@ class Game:
             hp = min(agent.hp + self.state.world.healing_rate, self.state.world.max_hp)
             self.physx_engine.update_agent(agent_idx=i, hp=hp)
 
-        self.physx_engine.simulate(
-            t=self.state.world.dt, n_steps=self.state.world.n_simulation_steps
-        )
+        self.physx_engine.simulate(t=self.state.world.dt, n_steps=self.state.world.n_simulation_steps)
 
         self.state.agents = self.physx_engine.agents
         self.state.missiles = self.physx_engine.missiles
@@ -130,14 +126,14 @@ class Game:
 
                 case 1:  # change acceleration
                     max_a = self.state.world.max_agent_acceleration
-                    self.physx_engine.update_agent(
-                        agent_idx=i, a=min(max(value, 0.0), max_a)
-                    )
+                    self.physx_engine.update_agent(agent_idx=i, a=min(max(value, 0.0), max_a))
 
                 case 2:  # fire
                     self.physx_engine.launch_missile(agent_idx=i)
 
                 case _:
                     logger.info("Unknown action from agent %d", i)
+
+        self.ticks += 1
 
         return self.state
