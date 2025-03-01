@@ -1,3 +1,6 @@
 [submodule "twsfwphysx/twsfwphysx"]
 	path = twsfwphysx/twsfwphysx
 	url = git@github.com:Tondorf/twsfwphysx.git
+[submodule "agents"]
+	path = agents
+	url = git@github.com:Tondorf/twsfw-agents.git
